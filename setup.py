@@ -9,8 +9,13 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 load_dotenv()
 project_id = os.getenv('PROJECT_ID')
 
-country_name = ["Thailand", "Japan", "United States"]
-country_code = ["TH", "JA", "US"]
+country_names = ["Thailand", "Japan", "United States"]
+country_codes = ["TH", "JA", "US"]
+table_names = [
+    "mortality_life_expectancy",
+    "birth_death_growth_rates",
+    "midyear_population_agespecific"
+]
 
 source_bucket = f"{project_id}-source"
 
@@ -36,8 +41,9 @@ def create_source_bucket(project_id: str):
     assert storage_client.get_bucket(bucket_name).exists()
 
 
-def export_bigquery_result_to_source_bucket(country_name: list,
-                                            country_code: list):
+def export_bigquery_result_to_source_bucket(country_names: list,
+                                            country_codes: list,
+                                            table_names: list):
     """
     Export bigquery queries to source bucket in csv format.
 
@@ -52,29 +58,28 @@ def export_bigquery_result_to_source_bucket(country_name: list,
     bigquery_client = bigquery.Client()
     storage_client = storage.Client()
 
-    for i in range(len(country_name)):
-        query = f"""
-            SELECT * 
-            FROM `bigquery-public-data.census_bureau_international.mortality_life_expectancy` 
-            WHERE country_name = "{country_name[i]}"
-            ORDER BY year 
-            DESC LIMIT 100;
-        """
+    for table in range(len(table_names)):
+        for j in range(len(country_names)):
+            query = f"""
+                SELECT * 
+                FROM `bigquery-public-data.census_bureau_international.{table_names[table]}` 
+                WHERE country_name = "{country_names[j]}"
+                ORDER BY year 
+                DESC LIMIT 100;
+            """
 
-        file_name = f"{country_code[i]}_mortality_life_expectancy.csv"
+            file_name = f"{country_codes[j]}_{table_names[table]}.csv"
+            print(f"Exporting {country_names[j]} data from {table_names[table]} table...")
 
-        query_job = bigquery_client.query(query)
-        destination_blob = storage_client.bucket(source_bucket).blob(file_name)
-        destination_blob.content_type = "text/csv"
-        query_job.result().to_dataframe().to_csv(destination_blob.open('w'), index=False)
+            query_job = bigquery_client.query(query)
+            destination_blob = storage_client.bucket(source_bucket).blob(file_name)
+            destination_blob.content_type = "text/csv"
+            query_job.result().to_dataframe().to_csv(destination_blob.open('w'), index=False)
 
-        bucket = storage_client.get_bucket(source_bucket)
-        blob = bucket.get_blob(file_name)
-        print(f'The query results are exported to {blob.public_url}')
+            print(f'The query results are exported to {source_bucket}')
 
     print("Export completed")
 
 
 if __name__ == "__main__":
-    create_source_bucket(project_id)
-    export_bigquery_result_to_source_bucket(country_name, country_code)
+    export_bigquery_result_to_source_bucket(country_names, country_codes, table_names)
