@@ -8,15 +8,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 
 load_dotenv()
 project_id = os.getenv('PROJECT_ID')
-
-country_names = ["Thailand", "Japan", "United States"]
-country_codes = ["TH", "JA", "US"]
-table_names = [
-    "mortality_life_expectancy",
-    "birth_death_growth_rates",
-    "midyear_population_agespecific"
-]
-
 source_bucket = f"{project_id}-source"
 
 
@@ -82,4 +73,15 @@ def export_bigquery_result_to_source_bucket(country_names: list,
 
 
 if __name__ == "__main__":
-    export_bigquery_result_to_source_bucket(country_names, country_codes, table_names)
+
+    country_names = ["Thailand", "Japan", "United States"]
+    country_codes = ["TH", "JA", "US"]
+    table_names = [
+        "mortality_life_expectancy",
+        "birth_death_growth_rates",
+        "midyear_population_agespecific"
+    ]
+
+    export_bigquery_result_to_source_bucket(country_names,
+                                            country_codes,
+                                            table_names)
