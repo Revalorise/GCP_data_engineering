@@ -8,7 +8,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 
 load_dotenv()
 project_id = os.getenv('PROJECT_ID')
-source_bucket = f"{project_id}-source"
 
 
 def create_source_bucket(project_id: str):
@@ -34,7 +33,8 @@ def create_source_bucket(project_id: str):
 
 def export_bigquery_result_to_source_bucket(country_names: list,
                                             country_codes: list,
-                                            table_names: list):
+                                            table_names: list,
+                                            source_bucket: str):
     """
     Export bigquery queries to source bucket in csv format.
 
@@ -49,25 +49,31 @@ def export_bigquery_result_to_source_bucket(country_names: list,
     bigquery_client = bigquery.Client()
     storage_client = storage.Client()
 
-    for table in range(len(table_names)):
-        for j in range(len(country_names)):
+    for table in table_names:
+        for i, country in enumerate(country_names):
             query = f"""
                 SELECT * 
-                FROM `bigquery-public-data.census_bureau_international.{table_names[table]}` 
-                WHERE country_name = "{country_names[j]}"
+                FROM `bigquery-public-data.census_bureau_international.{table}` 
+                WHERE country_name = "{country}"
                 ORDER BY year 
                 DESC LIMIT 100;
             """
 
-            file_name = f"{country_codes[j]}_{table_names[table]}.csv"
-            print(f"Exporting {country_names[j]} data from {table_names[table]} table...")
+            file_name = f"{country_codes[i]}_{table}.csv"
+            print(f"Exporting {country} data from {table} table...")
 
-            query_job = bigquery_client.query(query)
-            destination_blob = storage_client.bucket(source_bucket).blob(file_name)
-            destination_blob.content_type = "text/csv"
-            query_job.result().to_dataframe().to_csv(destination_blob.open('w'), index=False)
+            try:
+                query_job = bigquery_client.query(query)
+                result_df = query_job.result().to_dataframe()
 
-            print(f'The query results are exported to {source_bucket}')
+                destination_blob = storage_client.bucket(source_bucket).blob(file_name)
+                destination_blob.content_type = "text/csv"
+                with destination_blob.open('w') as blob:
+                    result_df.to_csv(blob, index=False)
+
+                print(f'The query results are exported to {source_bucket}\n')
+            except Exception as e:
+                print(f"An error occurred while processing {country} data from {table} table: {e}")
 
     print("Export completed")
 
@@ -81,7 +87,9 @@ if __name__ == "__main__":
         "birth_death_growth_rates",
         "midyear_population_agespecific"
     ]
+    source_bucket = f"{project_id}-source"
 
     export_bigquery_result_to_source_bucket(country_names,
                                             country_codes,
-                                            table_names)
+                                            table_names,
+                                            source_bucket)
